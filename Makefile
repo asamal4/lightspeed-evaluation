@@ -73,10 +73,10 @@ help: ## Show this help screen
 	@echo ''
 
 pylint:
-	pdm run pylint src
+	pdm run pylint src agent_eval/src
 
 pyright:
-	pdm run pyright src
+	pdm run pyright src  agent_eval/src
 
 docstyle:
 	pdm run pydocstyle -v .
