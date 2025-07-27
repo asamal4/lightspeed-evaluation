@@ -1,6 +1,8 @@
 """Tests for evaluation runner."""
 
-from unittest.mock import Mock, patch
+import os
+import tempfile
+from unittest.mock import Mock
 
 import pytest
 
@@ -9,6 +11,7 @@ from lsc_agent_eval.core.agent_goal_eval.models import (
     EvaluationDataConfig,
     EvaluationResult,
 )
+from lsc_agent_eval.core.agent_goal_eval.script_runner import ScriptRunner
 from lsc_agent_eval.core.utils.api_client import AgentHttpClient
 from lsc_agent_eval.core.utils.exceptions import AgentAPIError, ScriptExecutionError
 from lsc_agent_eval.core.utils.judge import JudgeModelManager
@@ -25,6 +28,13 @@ class TestEvaluationRunner:
         return mock_client
 
     @pytest.fixture
+    def mock_script_runner(self):
+        """Mock script runner."""
+        mock_runner = Mock(spec=ScriptRunner)
+        mock_runner.run_script.return_value = True
+        return mock_runner
+
+    @pytest.fixture
     def mock_judge_manager(self):
         """Mock judge manager."""
         mock_judge = Mock(spec=JudgeModelManager)
@@ -36,385 +46,338 @@ class TestEvaluationRunner:
         """Sample judge-llm evaluation configuration."""
         return EvaluationDataConfig(
             eval_id="test_001",
-            eval_query="What is Kubernetes?",
+            eval_query="What is Openshift Virtualization?",
             eval_type="judge-llm",
-            expected_response="Kubernetes is a container orchestration platform",
+            expected_response="OpenShift Virtualization is an extension of the OpenShift Container Platform",
         )
 
     @pytest.fixture
-    def sample_config_script(self):
+    def get_test_script_path(self):
+        """Create a temporary test script file and cleanup."""
+        # Setup
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as f:
+            f.write('#!/bin/bash\necho "test script"\nexit 0')
+            script_path = f.name
+        os.chmod(script_path, 0o755)
+
+        yield script_path
+
+        # Cleanup
+        os.unlink(script_path)
+
+    @pytest.fixture
+    def sample_config_script(self, get_test_script_path):
         """Sample script evaluation configuration."""
         return EvaluationDataConfig(
             eval_id="test_002",
             eval_query="Deploy nginx",
             eval_type="script",
-            eval_verify_script="./verify.sh",
+            eval_verify_script=get_test_script_path,
         )
 
     @pytest.fixture
     def sample_config_substring(self):
-        """Sample substring evaluation configuration."""
+        """Sample sub-string evaluation configuration."""
         return EvaluationDataConfig(
             eval_id="test_003",
-            eval_query="What is Docker?",
+            eval_query="What is Podman?",
             eval_type="sub-string",
-            expected_keywords=["container", "docker"],
+            expected_keywords=["container", "podman"],
         )
 
-    def test_init(self, mock_agent_client, mock_judge_manager):
+    def test_init(self, mock_agent_client, mock_script_runner, mock_judge_manager):
         """Test EvaluationRunner initialization."""
         runner = EvaluationRunner(
-            mock_agent_client, mock_judge_manager, kubeconfig="~/kubeconfig"
+            mock_agent_client,
+            mock_script_runner,
+            mock_judge_manager,
         )
 
         assert runner.agent_client == mock_agent_client
+        assert runner.script_runner == mock_script_runner
         assert runner.judge_manager == mock_judge_manager
-        assert runner.kubeconfig == "~/kubeconfig"
 
-    def test_init_without_judge_manager(self, mock_agent_client):
+    def test_init_without_judge_manager(self, mock_agent_client, mock_script_runner):
         """Test EvaluationRunner initialization without judge manager."""
-        runner = EvaluationRunner(mock_agent_client)
+        runner = EvaluationRunner(mock_agent_client, mock_script_runner)
 
         assert runner.agent_client == mock_agent_client
+        assert runner.script_runner == mock_script_runner
         assert runner.judge_manager is None
 
-    @patch("lsc_agent_eval.core.agent_goal_eval.evaluator.ScriptRunner")
     def test_run_evaluation_judge_llm_success(
         self,
-        mock_script_runner,
         mock_agent_client,
+        mock_script_runner,
         mock_judge_manager,
         sample_config_judge_llm,
     ):
         """Test successful judge-llm evaluation."""
-        # Mock agent response
-        mock_agent_client.query_agent.return_value = (
-            "Kubernetes is a container orchestration platform"
+        runner = EvaluationRunner(
+            mock_agent_client, mock_script_runner, mock_judge_manager
         )
 
-        # Mock judge response
-        mock_judge_manager.evaluate_response.return_value = "1"
-
-        runner = EvaluationRunner(mock_agent_client, mock_judge_manager)
-        result = runner.run_evaluation(sample_config_judge_llm, "openai", "gpt-4")
+        result = runner.run_evaluation(
+            sample_config_judge_llm,
+            "watsonx",
+            "ibm/granite-3-3-8b-instruct",
+            "conversation-uuid-123",
+        )
 
         assert isinstance(result, EvaluationResult)
         assert result.eval_id == "test_001"
-        assert result.result == "PASS"
+        assert result.query == "What is Openshift Virtualization?"
         assert result.eval_type == "judge-llm"
+        assert result.result == "PASS"
+        assert result.conversation_uuid == "conversation-uuid-123"
         assert result.error is None
 
-        # Verify agent was queried
+        # Verify agent was called
         mock_agent_client.query_agent.assert_called_once_with(
-            "What is Kubernetes?", "openai", "gpt-4"
+            {
+                "query": "What is Openshift Virtualization?",
+                "provider": "watsonx",
+                "model": "ibm/granite-3-3-8b-instruct",
+            },
+            "conversation-uuid-123",
         )
 
         # Verify judge was called
         mock_judge_manager.evaluate_response.assert_called_once()
 
-    @patch("lsc_agent_eval.core.agent_goal_eval.evaluator.ScriptRunner")
+    def test_run_evaluation_judge_llm_failure(
+        self,
+        mock_agent_client,
+        mock_script_runner,
+        mock_judge_manager,
+        sample_config_judge_llm,
+    ):
+        """Test failed judge-llm evaluation."""
+        # Mock judge to return 0 (failure)
+        mock_judge_manager.evaluate_response.return_value = "0"
+
+        runner = EvaluationRunner(
+            mock_agent_client, mock_script_runner, mock_judge_manager
+        )
+
+        result = runner.run_evaluation(
+            sample_config_judge_llm,
+            "openai",
+            "gpt-4",
+            "conversation-uuid-123",
+        )
+
+        assert result.result == "FAIL"
+        assert result.error is None
+
     def test_run_evaluation_script_success(
-        self, mock_script_runner_class, mock_agent_client, sample_config_script
+        self, mock_agent_client, mock_script_runner, sample_config_script
     ):
         """Test successful script evaluation."""
-        # Mock agent response
-        mock_agent_client.query_agent.return_value = (
-            "kubectl create deployment nginx --image=nginx"
+        runner = EvaluationRunner(mock_agent_client, mock_script_runner)
+
+        result = runner.run_evaluation(
+            sample_config_script,
+            "openai",
+            "gpt-4",
+            "conversation-uuid-123",
         )
-
-        # Mock script runner instance
-        mock_script_runner_instance = Mock()
-        mock_script_runner_instance.run_script.return_value = True
-        mock_script_runner_class.return_value = mock_script_runner_instance
-
-        runner = EvaluationRunner(mock_agent_client)
-        result = runner.run_evaluation(sample_config_script, "openai", "gpt-4")
 
         assert isinstance(result, EvaluationResult)
         assert result.eval_id == "test_002"
-        assert result.result == "PASS"
         assert result.eval_type == "script"
+        assert result.result == "PASS"
         assert result.error is None
 
-        # Verify ScriptRunner was created with the right kubeconfig
-        mock_script_runner_class.assert_called_with(kubeconfig=None)
-        # Verify script was executed
-        mock_script_runner_instance.run_script.assert_called_once_with("./verify.sh")
+        # Verify agent was called
+        mock_agent_client.query_agent.assert_called_once()
 
-    @patch("lsc_agent_eval.core.agent_goal_eval.evaluator.ScriptRunner")
+        # Verify script was run
+        mock_script_runner.run_script.assert_called_once_with(
+            sample_config_script.eval_verify_script
+        )
+
     def test_run_evaluation_script_failure(
-        self, mock_script_runner_class, mock_agent_client, sample_config_script
+        self, mock_agent_client, mock_script_runner, sample_config_script
     ):
-        """Test script evaluation failure."""
-        # Mock agent response
-        mock_agent_client.query_agent.return_value = (
-            "kubectl create deployment nginx --image=nginx"
+        """Test failed script evaluation."""
+        # Mock script to return False (failure)
+        mock_script_runner.run_script.return_value = False
+
+        runner = EvaluationRunner(mock_agent_client, mock_script_runner)
+
+        result = runner.run_evaluation(
+            sample_config_script,
+            "openai",
+            "gpt-4",
+            "conversation-uuid-123",
         )
 
-        # Mock script runner instance returning failure
-        mock_script_runner_instance = Mock()
-        mock_script_runner_instance.run_script.return_value = False
-        mock_script_runner_class.return_value = mock_script_runner_instance
-
-        runner = EvaluationRunner(mock_agent_client)
-        result = runner.run_evaluation(sample_config_script, "openai", "gpt-4")
-
-        assert isinstance(result, EvaluationResult)
-        assert result.eval_id == "test_002"
         assert result.result == "FAIL"
-        assert result.eval_type == "script"
         assert result.error is None
 
-    @patch("lsc_agent_eval.core.agent_goal_eval.evaluator.ScriptRunner")
-    def test_run_evaluation_script_with_kubeconfig(
-        self, mock_script_runner_class, mock_agent_client, sample_config_script
-    ):
-        """Test script evaluation with kubeconfig."""
-        # Mock agent response
-        mock_agent_client.query_agent.return_value = (
-            "kubectl create deployment nginx --image=nginx"
-        )
-
-        # Mock script runner instance
-        mock_script_runner_instance = Mock()
-        mock_script_runner_instance.run_script.return_value = True
-        mock_script_runner_class.return_value = mock_script_runner_instance
-
-        runner = EvaluationRunner(mock_agent_client, kubeconfig="~/kubeconfig")
-        result = runner.run_evaluation(sample_config_script, "openai", "gpt-4")
-
-        assert result.result == "PASS"
-
-        # Verify ScriptRunner was created with kubeconfig
-        mock_script_runner_class.assert_called_with(kubeconfig="~/kubeconfig")
-        # Verify script was executed
-        mock_script_runner_instance.run_script.assert_called_once_with("./verify.sh")
-
-    @patch("lsc_agent_eval.core.agent_goal_eval.evaluator.ScriptRunner")
     def test_run_evaluation_script_execution_error(
-        self, mock_script_runner_class, mock_agent_client, sample_config_script
+        self, mock_agent_client, mock_script_runner, sample_config_script
     ):
         """Test script evaluation with execution error."""
-        # Mock agent response
-        mock_agent_client.query_agent.return_value = (
-            "kubectl create deployment nginx --image=nginx"
-        )
-
-        # Mock script runner instance raising error
-        mock_script_runner_instance = Mock()
-        mock_script_runner_instance.run_script.side_effect = ScriptExecutionError(
+        # Mock script to raise exception
+        mock_script_runner.run_script.side_effect = ScriptExecutionError(
             "Script failed"
         )
-        mock_script_runner_class.return_value = mock_script_runner_instance
 
-        runner = EvaluationRunner(mock_agent_client)
-        result = runner.run_evaluation(sample_config_script, "openai", "gpt-4")
+        runner = EvaluationRunner(mock_agent_client, mock_script_runner)
 
-        assert isinstance(result, EvaluationResult)
-        assert result.eval_id == "test_002"
+        result = runner.run_evaluation(
+            sample_config_script,
+            "openai",
+            "gpt-4",
+            "conversation-uuid-123",
+        )
+
         assert result.result == "ERROR"
-        assert result.error == "Script failed"
+        assert "Script failed" in result.error
 
     def test_run_evaluation_substring_success(
-        self, mock_agent_client, sample_config_substring
+        self, mock_agent_client, mock_script_runner, sample_config_substring
     ):
-        """Test successful substring evaluation."""
+        """Test successful sub-string evaluation."""
         # Mock agent response containing expected keywords
-        mock_agent_client.query_agent.return_value = "Docker is a container platform"
+        mock_agent_client.query_agent.return_value = (
+            "Podman is an open-source container engine developed by Red Hat"
+        )
 
-        runner = EvaluationRunner(mock_agent_client)
-        result = runner.run_evaluation(sample_config_substring, "openai", "gpt-4")
+        runner = EvaluationRunner(mock_agent_client, mock_script_runner)
 
-        assert isinstance(result, EvaluationResult)
+        result = runner.run_evaluation(
+            sample_config_substring,
+            "openai",
+            "gpt-4",
+            "conversation-uuid-123",
+        )
+
         assert result.eval_id == "test_003"
         assert result.result == "PASS"
         assert result.eval_type == "sub-string"
+        assert result.error is None
 
     def test_run_evaluation_substring_failure(
-        self, mock_agent_client, sample_config_substring
+        self, mock_agent_client, mock_script_runner, sample_config_substring
     ):
-        """Test substring evaluation failure."""
+        """Test sub-string evaluation failure."""
         # Mock agent response not containing expected keywords
-        mock_agent_client.query_agent.return_value = "This is about virtual machines"
+        mock_agent_client.query_agent.return_value = "No information available"
 
-        runner = EvaluationRunner(mock_agent_client)
-        result = runner.run_evaluation(sample_config_substring, "openai", "gpt-4")
+        runner = EvaluationRunner(mock_agent_client, mock_script_runner)
 
-        assert isinstance(result, EvaluationResult)
+        result = runner.run_evaluation(
+            sample_config_substring,
+            "openai",
+            "gpt-4",
+            "conversation-uuid-123",
+        )
+
         assert result.eval_id == "test_003"
         assert result.result == "FAIL"
         assert result.eval_type == "sub-string"
-
-    @patch("lsc_agent_eval.core.agent_goal_eval.evaluator.ScriptRunner")
-    def test_run_evaluation_with_setup_script(
-        self, mock_script_runner_class, mock_agent_client, mock_judge_manager
-    ):
-        """Test evaluation with setup script."""
-        config = EvaluationDataConfig(
-            eval_id="test_setup",
-            eval_query="Test query",
-            eval_type="judge-llm",
-            expected_response="Test response",
-            eval_setup_script="./setup.sh",
-        )
-
-        # Mock script runner instance for setup
-        mock_script_runner_instance = Mock()
-        mock_script_runner_instance.run_script.return_value = True
-        mock_script_runner_class.return_value = mock_script_runner_instance
-
-        # Mock agent and judge responses
-        mock_agent_client.query_agent.return_value = "Test response"
-        mock_judge_manager.evaluate_response.return_value = "1"
-
-        runner = EvaluationRunner(mock_agent_client, mock_judge_manager)
-        result = runner.run_evaluation(config, "openai", "gpt-4")
-
-        assert result.result == "PASS"
-        # Verify setup script was called
-        mock_script_runner_instance.run_script.assert_called_with("./setup.sh")
-
-    @patch("lsc_agent_eval.core.agent_goal_eval.evaluator.ScriptRunner")
-    def test_run_evaluation_setup_script_failure(
-        self, mock_script_runner_class, mock_agent_client, mock_judge_manager
-    ):
-        """Test evaluation with setup script failure."""
-        config = EvaluationDataConfig(
-            eval_id="test_setup_fail",
-            eval_query="Test query",
-            eval_type="judge-llm",
-            expected_response="Test response",
-            eval_setup_script="./setup.sh",
-        )
-
-        # Mock failing setup script execution
-        mock_script_runner_instance = Mock()
-        mock_script_runner_instance.run_script.return_value = False
-        mock_script_runner_class.return_value = mock_script_runner_instance
-
-        runner = EvaluationRunner(mock_agent_client, mock_judge_manager)
-        result = runner.run_evaluation(config, "openai", "gpt-4")
-
-        assert result.result == "ERROR"
-        assert "Setup script failed" in result.error
-
-    @patch("lsc_agent_eval.core.agent_goal_eval.evaluator.ScriptRunner")
-    def test_run_evaluation_with_cleanup_script(
-        self, mock_script_runner_class, mock_agent_client, mock_judge_manager
-    ):
-        """Test evaluation with cleanup script."""
-        config = EvaluationDataConfig(
-            eval_id="test_cleanup",
-            eval_query="Test query",
-            eval_type="judge-llm",
-            expected_response="Test response",
-            eval_cleanup_script="./cleanup.sh",
-        )
-
-        # Mock successful cleanup script execution
-        mock_script_runner_instance = Mock()
-        mock_script_runner_instance.run_script.return_value = True
-        mock_script_runner_class.return_value = mock_script_runner_instance
-
-        # Mock agent and judge responses
-        mock_agent_client.query_agent.return_value = "Test response"
-        mock_judge_manager.evaluate_response.return_value = "1"
-
-        runner = EvaluationRunner(mock_agent_client, mock_judge_manager)
-        result = runner.run_evaluation(config, "openai", "gpt-4")
-
-        assert result.result == "PASS"
-        # Verify cleanup script was called
-        mock_script_runner_instance.run_script.assert_called_with("./cleanup.sh")
+        assert result.error is None
 
     def test_run_evaluation_agent_api_error(
-        self, mock_agent_client, mock_judge_manager, sample_config_judge_llm
+        self, mock_agent_client, mock_script_runner, sample_config_judge_llm
     ):
         """Test evaluation with agent API error."""
-        # Mock agent API error
+        # Mock agent client to raise API error
         mock_agent_client.query_agent.side_effect = AgentAPIError(
             "API connection failed"
         )
 
-        runner = EvaluationRunner(mock_agent_client, mock_judge_manager)
-        result = runner.run_evaluation(sample_config_judge_llm, "openai", "gpt-4")
+        runner = EvaluationRunner(mock_agent_client, mock_script_runner)
 
-        assert isinstance(result, EvaluationResult)
-        assert result.result == "ERROR"
-        assert "API connection failed" in result.error
-
-    def test_run_evaluation_unknown_type(self, mock_agent_client):
-        """Test evaluation with unknown evaluation type."""
-        config = EvaluationDataConfig(
-            eval_id="test_unknown",
-            eval_query="Test query",
-            eval_type="unknown-type",
+        result = runner.run_evaluation(
+            sample_config_judge_llm,
+            "openai",
+            "gpt-4",
+            "conversation-uuid-123",
         )
 
-        # Mock agent response
-        mock_agent_client.query_agent.return_value = "Test response"
-
-        runner = EvaluationRunner(mock_agent_client)
-        result = runner.run_evaluation(config, "openai", "gpt-4")
-
-        assert isinstance(result, EvaluationResult)
-        assert result.result == "FAIL"
-
-    def test_get_judge_manager(self, mock_agent_client, mock_judge_manager):
-        """Test get_judge_manager method."""
-        runner = EvaluationRunner(mock_agent_client, mock_judge_manager)
-        assert runner.get_judge_manager() == mock_judge_manager
-
-        runner_no_judge = EvaluationRunner(mock_agent_client)
-        assert runner_no_judge.get_judge_manager() is None
-
-    @patch("lsc_agent_eval.core.agent_goal_eval.evaluator.ScriptRunner")
-    def test_run_evaluation_judge_llm_failure(
-        self,
-        mock_script_runner,
-        mock_agent_client,
-        mock_judge_manager,
-        sample_config_judge_llm,
-    ):
-        """Test judge-llm evaluation failure."""
-        # Mock agent response
-        mock_agent_client.query_agent.return_value = "Some incorrect response"
-
-        # Mock judge response indicating failure
-        mock_judge_manager.evaluate_response.return_value = "0"
-
-        runner = EvaluationRunner(mock_agent_client, mock_judge_manager)
-        result = runner.run_evaluation(sample_config_judge_llm, "openai", "gpt-4")
-
-        assert isinstance(result, EvaluationResult)
-        assert result.eval_id == "test_001"
-        assert result.result == "FAIL"
-        assert result.eval_type == "judge-llm"
-        assert result.error is None
-
-    @patch("lsc_agent_eval.core.agent_goal_eval.evaluator.ScriptRunner")
-    def test_run_evaluation_judge_llm_error(
-        self,
-        mock_script_runner,
-        mock_agent_client,
-        mock_judge_manager,
-        sample_config_judge_llm,
-    ):
-        """Test judge-llm evaluation error."""
-        # Mock agent response
-        mock_agent_client.query_agent.return_value = "Some incorrect response"
-
-        # Mock judge response indicating failure
-        mock_judge_manager.evaluate_response.return_value = "00"
-
-        runner = EvaluationRunner(mock_agent_client, mock_judge_manager)
-        result = runner.run_evaluation(sample_config_judge_llm, "openai", "gpt-4")
-
-        assert isinstance(result, EvaluationResult)
         assert result.eval_id == "test_001"
         assert result.result == "ERROR"
         assert result.eval_type == "judge-llm"
-        assert result.error == (
-            "Invalid response from the judge model. "
-            "Expected value either 0/1. Actual value: 00"
+        assert "API connection failed" in result.error
+
+    def test_run_evaluation_no_verify_script_for_script_type(
+        self, mock_agent_client, mock_script_runner
+    ):
+        """Test script evaluation without verify script should not occur due to Pydantic validation."""
+        # This test verifies that Pydantic prevents invalid configurations
+        with pytest.raises(Exception):  # Pydantic ValidationError
+            EvaluationDataConfig(
+                eval_id="test_invalid",
+                eval_query="Test query",
+                eval_type="script",
+                # Missing eval_verify_script
+            )
+
+    def test_substring_evaluation_logic(self, mock_agent_client, mock_script_runner):
+        """Test sub-string evaluation logic with various scenarios."""
+        runner = EvaluationRunner(mock_agent_client, mock_script_runner)
+
+        config = EvaluationDataConfig(
+            eval_id="substring_test",
+            eval_query="Test query",
+            eval_type="sub-string",
+            expected_keywords=["keyword1", "keyword2"],
+        )
+
+        # Test all keywords present - should PASS
+        mock_agent_client.query_agent.return_value = (
+            "Response with keyword1 and keyword2"
+        )
+        result = runner.run_evaluation(config, "openai", "gpt-4", "uuid-123")
+        assert result.result == "PASS"
+
+        # Test some keywords missing (only one present) - should FAIL
+        mock_agent_client.query_agent.return_value = "Response with only keyword1"
+        result = runner.run_evaluation(config, "openai", "gpt-4", "uuid-123")
+        assert result.result == "FAIL"
+
+        # Test no keywords present - should FAIL
+        mock_agent_client.query_agent.return_value = "Response with no matching terms"
+        result = runner.run_evaluation(config, "openai", "gpt-4", "uuid-123")
+        assert result.result == "FAIL"
+
+        # Test case insensitive matching
+        mock_agent_client.query_agent.return_value = (
+            "Response with KEYWORD1 and Keyword2"
+        )
+        result = runner.run_evaluation(config, "openai", "gpt-4", "uuid-123")
+        assert result.result == "PASS"
+
+    def test_conversation_uuid_propagation(
+        self, mock_agent_client, mock_script_runner, mock_judge_manager
+    ):
+        """Test that conversation UUID is properly propagated to results."""
+        runner = EvaluationRunner(
+            mock_agent_client, mock_script_runner, mock_judge_manager
+        )
+
+        config = EvaluationDataConfig(
+            eval_id="uuid_test",
+            eval_query="Test query",
+            eval_type="judge-llm",
+            expected_response="Test response",
+        )
+
+        test_uuid = "test-conversation-uuid-456"
+        result = runner.run_evaluation(config, "openai", "gpt-4", test_uuid)
+
+        assert result.conversation_uuid == test_uuid
+
+        # Verify UUID was passed to agent client
+        mock_agent_client.query_agent.assert_called_once_with(
+            {
+                "query": "Test query",
+                "provider": "openai",
+                "model": "gpt-4",
+            },
+            test_uuid,
         )

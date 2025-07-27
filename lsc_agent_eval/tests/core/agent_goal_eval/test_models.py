@@ -1,16 +1,24 @@
 """Tests for agent evaluation models."""
 
+from pathlib import Path
+from unittest.mock import mock_open, patch
+
+import pytest
+from pydantic import ValidationError
+
 from lsc_agent_eval.core.agent_goal_eval.models import (
+    ConversationDataConfig,
     EvaluationDataConfig,
     EvaluationResult,
+    EvaluationStats,
 )
 
 
 class TestEvaluationResult:
-    """Test EvaluationResult data class."""
+    """Test Evaluation result data class."""
 
     def test_evaluation_result_creation(self):
-        """Test creating EvaluationResult instance."""
+        """Test creating Evaluation result instance."""
         result = EvaluationResult(
             eval_id="test_001",
             query="What is Kubernetes?",
@@ -28,7 +36,7 @@ class TestEvaluationResult:
         assert result.error is None
 
     def test_evaluation_result_with_error(self):
-        """Test EvaluationResult with error."""
+        """Test Evaluation result with error."""
         result = EvaluationResult(
             eval_id="test_002",
             query="Deploy nginx",
@@ -46,7 +54,7 @@ class TestEvaluationResult:
         assert result.error == "Script execution failed"
 
     def test_evaluation_result_defaults(self):
-        """Test EvaluationResult with default values."""
+        """Test Evaluation result with default values."""
         result = EvaluationResult(
             eval_id="test_003",
             query="Test query",
@@ -57,28 +65,57 @@ class TestEvaluationResult:
 
         assert result.error is None
 
+    def test_evaluation_result_invalid_result_type(self):
+        """Test Evaluation result with invalid result type."""
+        with pytest.raises(ValidationError) as exc_info:
+            EvaluationResult(
+                eval_id="test_004",
+                query="Test query",
+                response="Test response",
+                eval_type="judge-llm",
+                result="INVALID",
+            )
+
+        assert "Result must be one of" in str(exc_info.value)
+
+    def test_evaluation_result_invalid_eval_type(self):
+        """Test Evaluation result with invalid eval type."""
+        with pytest.raises(ValidationError) as exc_info:
+            EvaluationResult(
+                eval_id="test_005",
+                query="Test query",
+                response="Test response",
+                eval_type="invalid-type",
+                result="PASS",
+            )
+
+        assert "eval_type must be one of" in str(exc_info.value)
+
 
 class TestEvaluationDataConfig:
-    """Test EvaluationDataConfig data class."""
+    """Test Evaluation data config data class."""
 
-    def test_evaluation_data_config_minimal(self):
-        """Test creating minimal EvaluationDataConfig."""
+    def test_evaluation_data_config_minimal_judge_llm(self):
+        """Test creating minimal Evaluation data config for judge-llm."""
         config = EvaluationDataConfig(
             eval_id="test_001",
             eval_query="What is Kubernetes?",
+            eval_type="judge-llm",
+            expected_response="Kubernetes is a container orchestration platform",
         )
 
         assert config.eval_id == "test_001"
         assert config.eval_query == "What is Kubernetes?"
-        assert config.eval_type == "judge-llm"  # default
-        assert config.expected_response is None
+        assert config.eval_type == "judge-llm"
+        assert (
+            config.expected_response
+            == "Kubernetes is a container orchestration platform"
+        )
         assert config.expected_keywords is None
-        assert config.eval_setup_script is None
         assert config.eval_verify_script is None
-        assert config.eval_cleanup_script is None
 
     def test_evaluation_data_config_judge_llm(self):
-        """Test EvaluationDataConfig for judge-llm evaluation."""
+        """Test Evaluation data config for judge-llm evaluation."""
         config = EvaluationDataConfig(
             eval_id="judge_test",
             eval_query="Explain containers",
@@ -91,19 +128,18 @@ class TestEvaluationDataConfig:
         assert config.eval_type == "judge-llm"
         assert config.expected_response == "Containers are lightweight virtualization"
         assert config.expected_keywords is None
-        assert config.eval_setup_script is None
         assert config.eval_verify_script is None
-        assert config.eval_cleanup_script is None
 
-    def test_evaluation_data_config_script(self):
-        """Test EvaluationDataConfig for script evaluation."""
+    @patch("builtins.open", mock_open())
+    @patch("pathlib.Path.is_file", return_value=True)
+    @patch("pathlib.Path.exists", return_value=True)
+    def test_evaluation_data_config_script(self, mock_exists, mock_is_file):
+        """Test Evaluation data config for script evaluation."""
         config = EvaluationDataConfig(
             eval_id="script_test",
             eval_query="Deploy nginx pod",
             eval_type="script",
-            eval_setup_script="./setup.sh",
-            eval_verify_script="./verify.sh",
-            eval_cleanup_script="./cleanup.sh",
+            eval_verify_script="/mock/script/path.sh",
         )
 
         assert config.eval_id == "script_test"
@@ -111,12 +147,14 @@ class TestEvaluationDataConfig:
         assert config.eval_type == "script"
         assert config.expected_response is None
         assert config.expected_keywords is None
-        assert config.eval_setup_script == "./setup.sh"
-        assert config.eval_verify_script == "./verify.sh"
-        assert config.eval_cleanup_script == "./cleanup.sh"
+        assert isinstance(config.eval_verify_script, Path)
+
+        # Verify path validation was called
+        mock_exists.assert_called()
+        mock_is_file.assert_called()
 
     def test_evaluation_data_config_substring(self):
-        """Test EvaluationDataConfig for sub-string evaluation."""
+        """Test Evaluation data config for sub-string evaluation."""
         config = EvaluationDataConfig(
             eval_id="substring_test",
             eval_query="List container benefits",
@@ -129,28 +167,242 @@ class TestEvaluationDataConfig:
         assert config.eval_type == "sub-string"
         assert config.expected_response is None
         assert config.expected_keywords == ["isolation", "portability", "efficiency"]
-        assert config.eval_setup_script is None
         assert config.eval_verify_script is None
-        assert config.eval_cleanup_script is None
 
     def test_evaluation_data_config_all_fields(self):
-        """Test EvaluationDataConfig with all fields."""
+        """Test Evaluation data config with all available fields."""
         config = EvaluationDataConfig(
             eval_id="full_test",
             eval_query="What is OpenShift?",
             eval_type="judge-llm",
             expected_response="OpenShift is a Kubernetes platform",
-            expected_keywords=["kubernetes", "platform", "container"],
-            eval_setup_script="./setup.sh",
-            eval_verify_script="./verify.sh",
-            eval_cleanup_script="./cleanup.sh",
+            description="Test evaluation for OpenShift knowledge",
         )
 
         assert config.eval_id == "full_test"
         assert config.eval_query == "What is OpenShift?"
         assert config.eval_type == "judge-llm"
         assert config.expected_response == "OpenShift is a Kubernetes platform"
-        assert config.expected_keywords == ["kubernetes", "platform", "container"]
-        assert config.eval_setup_script == "./setup.sh"
-        assert config.eval_verify_script == "./verify.sh"
-        assert config.eval_cleanup_script == "./cleanup.sh"
+        assert config.description == "Test evaluation for OpenShift knowledge"
+        assert config.expected_keywords is None
+        assert config.eval_verify_script is None
+
+    def test_evaluation_data_config_missing_eval_type(self):
+        """Test Evaluation data config with missing eval_type (should fail)."""
+        with pytest.raises(ValidationError) as exc_info:
+            EvaluationDataConfig(
+                eval_id="test_001",
+                eval_query="What is Kubernetes?",
+            )
+
+        assert "Field required" in str(exc_info.value)
+
+    def test_evaluation_data_config_judge_llm_missing_expected_response(self):
+        """Test judge-llm evaluation missing expected_response."""
+        with pytest.raises(ValidationError) as exc_info:
+            EvaluationDataConfig(
+                eval_id="test_judge",
+                eval_query="Test query",
+                eval_type="judge-llm",
+            )
+
+        assert "requires non-empty 'expected_response'" in str(exc_info.value)
+
+    def test_evaluation_data_config_substring_missing_keywords(self):
+        """Test sub-string evaluation missing expected_keywords."""
+        with pytest.raises(ValidationError) as exc_info:
+            EvaluationDataConfig(
+                eval_id="test_substring",
+                eval_query="Test query",
+                eval_type="sub-string",
+            )
+
+        assert "requires non-empty 'expected_keywords'" in str(exc_info.value)
+
+    def test_evaluation_data_config_script_missing_verify_script(self):
+        """Test script evaluation missing eval_verify_script."""
+        with pytest.raises(ValidationError) as exc_info:
+            EvaluationDataConfig(
+                eval_id="test_script",
+                eval_query="Test query",
+                eval_type="script",
+            )
+
+        assert "requires non-empty 'eval_verify_script'" in str(exc_info.value)
+
+    def test_evaluation_data_config_script_nonexistent_file(self):
+        """Test script evaluation with non-existent script file."""
+        with pytest.raises(ValidationError) as exc_info:
+            EvaluationDataConfig(
+                eval_id="test_script",
+                eval_query="Test query",
+                eval_type="script",
+                eval_verify_script="/non/existent/script.sh",
+            )
+
+        assert "file not found" in str(exc_info.value)
+
+
+class TestConversationDataConfig:
+    """Test Conversation data config."""
+
+    def test_conversation_config_minimal(self):
+        """Test creating minimal Conversation data config."""
+        config = ConversationDataConfig(
+            conversation_group="test_conv",
+            conversation=[
+                EvaluationDataConfig(
+                    eval_id="test_001",
+                    eval_query="What is Kubernetes?",
+                    eval_type="judge-llm",
+                    expected_response="Kubernetes is a platform",
+                )
+            ],
+        )
+
+        assert config.conversation_group == "test_conv"
+        assert len(config.conversation) == 1
+        assert config.conversation[0].eval_id == "test_001"
+        assert config.conversation_uuid  # UUID should be generated
+        assert config.description is None
+        assert config.setup_script is None
+        assert config.cleanup_script is None
+
+    @patch("builtins.open", mock_open())
+    @patch("pathlib.Path.is_file", return_value=True)
+    @patch("pathlib.Path.exists", return_value=True)
+    def test_conversation_config_with_scripts(self, mock_exists, mock_is_file):
+        """Test Conversation data config with setup and cleanup scripts."""
+        config = ConversationDataConfig(
+            conversation_group="test_conv_scripts",
+            description="Test conversation with scripts",
+            setup_script="/mock/setup.sh",
+            cleanup_script="/mock/cleanup.sh",
+            conversation=[
+                EvaluationDataConfig(
+                    eval_id="test_001",
+                    eval_query="Test query",
+                    eval_type="judge-llm",
+                    expected_response="Test response",
+                )
+            ],
+        )
+
+        assert config.conversation_group == "test_conv_scripts"
+        assert config.description == "Test conversation with scripts"
+        assert isinstance(config.setup_script, Path)
+        assert isinstance(config.cleanup_script, Path)
+
+    def test_conversation_config_empty_group_name(self):
+        """Test Conversation data config with empty group name."""
+        with pytest.raises(ValidationError) as exc_info:
+            ConversationDataConfig(
+                conversation_group="   ",  # Empty after strip
+                conversation=[
+                    EvaluationDataConfig(
+                        eval_id="test_001",
+                        eval_query="Test query",
+                        eval_type="judge-llm",
+                        expected_response="Test response",
+                    )
+                ],
+            )
+
+        assert "cannot be empty" in str(exc_info.value)
+
+    def test_conversation_config_nonexistent_script(self):
+        """Test Conversation data config with non-existent script."""
+        with pytest.raises(ValidationError) as exc_info:
+            ConversationDataConfig(
+                conversation_group="test_conv",
+                setup_script="/non/existent/setup.sh",
+                conversation=[
+                    EvaluationDataConfig(
+                        eval_id="test_001",
+                        eval_query="Test query",
+                        eval_type="judge-llm",
+                        expected_response="Test response",
+                    )
+                ],
+            )
+
+        assert "file not found" in str(exc_info.value)
+
+    def test_conversation_config_duplicate_eval_ids(self):
+        """Test Conversation data config with duplicate eval_ids."""
+        with pytest.raises(ValidationError) as exc_info:
+            ConversationDataConfig(
+                conversation_group="test_conv",
+                conversation=[
+                    EvaluationDataConfig(
+                        eval_id="duplicate_id",
+                        eval_query="First query",
+                        eval_type="judge-llm",
+                        expected_response="First response",
+                    ),
+                    EvaluationDataConfig(
+                        eval_id="duplicate_id",
+                        eval_query="Second query",
+                        eval_type="judge-llm",
+                        expected_response="Second response",
+                    ),
+                ],
+            )
+
+        assert "Duplicate eval_id" in str(exc_info.value)
+
+
+class TestEvaluationStats:
+    """Test Evaluation statistics data class."""
+
+    def test_evaluation_stats_from_results(self):
+        """Test Evaluation statistics creation method."""
+        results = [
+            EvaluationResult(
+                eval_id="test_001",
+                query="Query 1",
+                response="Response 1",
+                eval_type="judge-llm",
+                result="PASS",
+                conversation_group="conv1",
+            ),
+            EvaluationResult(
+                eval_id="test_002",
+                query="Query 2",
+                response="Response 2",
+                eval_type="script",
+                result="FAIL",
+                conversation_group="conv1",
+            ),
+            EvaluationResult(
+                eval_id="test_003",
+                query="Query 3",
+                response="Response 3",
+                eval_type="sub-string",
+                result="PASS",
+                conversation_group="conv2",
+            ),
+        ]
+
+        stats = EvaluationStats.from_results(results)
+
+        assert stats.total_evaluations == 3
+        assert stats.total_conversations == 2
+        assert stats.passed == 2
+        assert stats.failed == 1
+        assert stats.errored == 0
+        # Allow for floating point precision differences
+        assert abs(stats.success_rate - 66.67) < 0.01
+
+        # Check stats by conversation
+        assert "conv1" in stats.by_conversation
+        assert "conv2" in stats.by_conversation
+        assert stats.by_conversation["conv1"]["total"] == 2
+        assert stats.by_conversation["conv1"]["passed"] == 1
+        assert stats.by_conversation["conv2"]["total"] == 1
+        assert stats.by_conversation["conv2"]["passed"] == 1
+
+        # Check stats by eval_type
+        assert "judge-llm" in stats.by_eval_type
+        assert "script" in stats.by_eval_type
+        assert "sub-string" in stats.by_eval_type

@@ -47,21 +47,24 @@ class AgentHttpClient:
             raise AgentAPIError(f"Error reading token file: {e}") from e
 
     def query_agent(
-        self, query: str, provider: str, model: str, timeout: int = 300
+        self,
+        api_input: dict[str, str],
+        conversation_uuid: Optional[str] = None,
+        timeout: int = 300,
     ) -> str:
         """Query the agent and return response."""
         if not self.client:
             raise AgentAPIError("HTTP client not initialized")
 
         try:
-            api_input = {
-                "query": query,
-                "provider": provider,
-                "model": model,
-            }
+            # Add conversation_uuid if provided
+            request_data = api_input.copy()
+            if conversation_uuid:
+                request_data["conversation_id"] = conversation_uuid
+
             response = self.client.post(
                 "/v1/query",
-                json=api_input,
+                json=request_data,
                 timeout=timeout,
             )
             response.raise_for_status()
