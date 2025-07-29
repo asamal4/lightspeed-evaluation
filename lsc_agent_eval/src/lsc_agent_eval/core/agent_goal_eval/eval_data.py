@@ -83,10 +83,9 @@ class AgentGoalEvalDataManager:
                 self.conversations.append(conversation_config)
 
                 logger.info(
-                    "Loaded conversation '%s' with %d evaluations (UUID: %s)",
+                    "Loaded conversation '%s' with %d evaluations",
                     conversation_config.conversation_group,
                     len(conversation_config.conversation),
-                    conversation_config.conversation_uuid,
                 )
 
             except ValidationError as e:

@@ -52,7 +52,7 @@ class ResultsManager:
             data.append(
                 {
                     "conversation_group": result.conversation_group,
-                    "conversation_uuid": result.conversation_uuid,
+                    "conversation_id": result.conversation_id,
                     "eval_id": result.eval_id,
                     "query": result.query,
                     "response": result.response,

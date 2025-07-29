@@ -3,7 +3,7 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from tqdm import tqdm
 
@@ -98,9 +98,11 @@ class AgentGoalEval:
     ) -> list["EvaluationResult"]:
         """Process single conversation group."""
         conversation_group = conversation.conversation_group
-        conversation_uuid = conversation.conversation_uuid
         evaluations = conversation.conversation
-        print(f"   Conversation ID: {conversation_uuid}")
+
+        # Always start with None - conversation_id will be obtained from first API call
+        conversation_id = None
+        print(f"   Conversation ID: Will be received from API")
         print(f"   Evaluations count: {len(evaluations)}")
 
         results = []
@@ -113,7 +115,7 @@ class AgentGoalEval:
                 # If setup fails, mark all evaluations as ERROR
                 for eval_data in evaluations:
                     error_result = create_error_result(
-                        eval_data, f"Setup script failed: {str(e)}", conversation_uuid
+                        eval_data, f"Setup script failed: {str(e)}", conversation_id
                     )
                     results.append(error_result)
                 print(f"❌ Setup script failed for {conversation_group}: {e}")
@@ -122,7 +124,7 @@ class AgentGoalEval:
         # Run evaluations
         print(f"   Running {len(evaluations)} evaluations...")
         evaluation_results = self._run_conversation_evaluations(
-            evaluations, conversation_group, conversation_uuid
+            evaluations, conversation_group, conversation_id
         )
         results.extend(evaluation_results)
 
@@ -156,7 +158,7 @@ class AgentGoalEval:
         self,
         evaluations: list["EvaluationDataConfig"],
         conversation_group: str,
-        conversation_uuid: str,
+        conversation_id: Optional[str],
     ) -> list["EvaluationResult"]:
         """Run all evaluations for a conversation."""
         results = []
@@ -170,8 +172,14 @@ class AgentGoalEval:
                     eval_data,
                     self.eval_args.agent_provider,
                     self.eval_args.agent_model,
-                    conversation_uuid,
+                    conversation_id,
                 )
+                
+                # Update conversation_id from API response for subsequent evaluations
+                if conversation_id is None:
+                    conversation_id = result.conversation_id
+                    print(f"  Received conversation ID from API: {result.conversation_id}")
+                
                 self._print_individual_result(eval_data, result, pbar)
                 results.append(result)
 
@@ -192,7 +200,8 @@ class AgentGoalEval:
             case _:
                 marker = "⚠️ "
         pbar.write(
-            f"{marker} {result.conversation_group}/{result.eval_id}: {result.result}"
+            f"{marker} {result.conversation_group}/{result.eval_id} "
+            f"{result.conversation_id}: {result.result}"
         )
 
         if result.result != "PASS":

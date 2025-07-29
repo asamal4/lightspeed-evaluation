@@ -153,10 +153,6 @@ class ConversationDataConfig(BaseModel):
     conversation_group: str = Field(
         ..., min_length=1, max_length=100, description="Conversation group identifier"
     )
-    conversation_uuid: str = Field(
-        default_factory=lambda: str(uuid.uuid4()),
-        description="Generated UUID for API calls",
-    )
     conversation: list[EvaluationDataConfig] = Field(
         ..., min_length=1, description="List of evaluations in this conversation group"
     )
@@ -202,10 +198,9 @@ class ConversationDataConfig(BaseModel):
                 f"Conversation '{self.conversation_group}' must have at least one evaluation"
             )
 
-        # Set conversation group/uuid for all evaluations
+        # Set conversation group for all evaluations
         for eval_config in self.conversation:
             eval_config.conversation_group = self.conversation_group
-            eval_config.conversation_uuid = self.conversation_uuid
 
         # Check for duplicate eval_ids within conversation
         eval_ids = [eval_config.eval_id for eval_config in self.conversation]
@@ -227,7 +222,7 @@ class EvaluationResult(BaseModel):
     eval_type: str = Field(..., description="Type of evaluation performed")
     result: str = Field(..., description="Evaluation result")
     conversation_group: Optional[str] = Field(None, description="Conversation group")
-    conversation_uuid: Optional[str] = Field(None, description="Conversation UUID")
+    conversation_id: Optional[str] = Field(None, description="Conversation ID")
     error: Optional[str] = Field(None, description="Error message if any")
 
     @field_validator("result")

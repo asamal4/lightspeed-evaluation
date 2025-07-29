@@ -35,30 +35,30 @@ class EvaluationRunner:
         data_config: "EvaluationDataConfig",
         agent_provider: str,
         agent_model: str,
-        conversation_uuid: Optional[str] = None,
+        conversation_id: Optional[str] = None,
     ) -> "EvaluationResult":
         """Run a single evaluation based on configuration."""
         try:
             # Query the agent
-            response = self.agent_client.query_agent(
-                {
-                    "query": data_config.eval_query,
-                    "provider": agent_provider,
-                    "model": agent_model,
-                },
-                conversation_uuid,
-            )
+            api_input = {
+                "query": data_config.eval_query,
+                "provider": agent_provider,
+                "model": agent_model,
+                "conversation_id": conversation_id
+            }
+                
+            response, conversation_id = self.agent_client.query_agent(api_input)
 
             # Evaluate response based on type
             success = self._evaluate_response(data_config, response)
 
             return create_success_result(
-                data_config, response, success, conversation_uuid
+                data_config, response, success, conversation_id
             )
 
         except (AgentAPIError, ScriptExecutionError, JudgeModelError) as e:
             logger.error("Evaluation failed for %s: %s", data_config.eval_id, e)
-            return create_error_result(data_config, str(e), conversation_uuid)
+            return create_error_result(data_config, str(e), conversation_id)
 
     def _evaluate_response(
         self, data_config: "EvaluationDataConfig", response: str
