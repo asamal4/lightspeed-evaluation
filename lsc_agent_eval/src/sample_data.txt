@@ -1,0 +1,62 @@
+data: {"event": "start", "data": {"conversation_id": "82013696-5fd4-4f6f-a704-b3717bffcb76"}}
+
+data: {"event": "token", "data": {"id": 0, "role": "inference", "token": ""}}
+
+data: {"event": "tool_call", "data": {"id": 1, "role": "inference", "token": "{}"}}
+
+data: {"event": "tool_call", "data": {"id": 2, "role": "inference", "token": ")"}}
+
+data: {"event": "tool_call", "data": {"id": 3, "role": "inference", "token": "list_versions"}}
+
+data: {"event": "tool_call", "data": {"id": 4, "role": "tool_execution", "token": ""}}
+
+data: {"event": "tool_call", "data": {"id": 5, "role": "tool_execution", "token": "Tool:list_versions arguments:{}"}}
+
+data: {"event": "tool_call", "data": {"id": 5, "role": "tool_execution", "token": "Tool:list_versions response:[TextContentItem(text='{\"4.10.67\": {\"cpu_architectures\": [\"x86_64\", \"arm64\"], \"display_name\": \"4.10.67\", \"support_level\": \"end-of-life\"}, \"4.11.59\": {\"cpu_architectures\": [\"x86_64\", \"arm64\"], \"display_name\": \"4.11.59\", \"support_level\": \"end-of-life\"}, \"4.12.71\": {\"cpu_architectures\": [\"x86_64\"], \"display_name\": \"4.12.71\", \"support_level\": \"Extended Support\"}, \"4.14.51\": {\"cpu_architectures\": [\"arm64\", \"x86_64\", \"ppc64le\", \"s390x\"], \"display_name\": \"4.14.51\", \"support_level\": \"Extended Support\"}, \"4.14.51-multi\": {\"cpu_architectures\": [\"x86_64\", \"arm64\", \"s390x\", \"ppc64le\"], \"display_name\": \"4.14.51-multi\", \"support_level\": \"Extended Support\"}, \"4.15.55\": {\"cpu_architectures\": [\"ppc64le\", \"s390x\", \"x86_64\", \"arm64\"], \"display_name\": \"4.15.55\", \"support_level\": \"maintenance\"}, \"4.15.55-multi\": {\"cpu_architectures\": [\"x86_64\", \"arm64\", \"s390x\", \"ppc64le\"], \"display_name\": \"4.15.55-multi\", \"support_level\": \"maintenance\"}, \"4.16.44\": {\"cpu_architectures\": [\"x86_64\", \"ppc64le\", \"arm64\", \"s390x\"], \"display_name\": \"4.16.44\", \"support_level\": \"maintenance\"}, \"4.16.44-multi\": {\"cpu_architectures\": [\"x86_64\", \"arm64\", \"s390x\", \"ppc64le\"], \"display_name\": \"4.16.44-multi\", \"support_level\": \"maintenance\"}, \"4.17.36\": {\"cpu_architectures\": [\"x86_64\", \"ppc64le\", \"s390x\", \"arm64\"], \"display_name\": \"4.17.36\", \"support_level\": \"maintenance\"}, \"4.17.36-multi\": {\"cpu_architectures\": [\"x86_64\", \"arm64\", \"s390x\", \"ppc64le\"], \"display_name\": \"4.17.36-multi\", \"support_level\": \"maintenance\"}, \"4.18.20\": {\"cpu_architectures\": [\"s390x\", \"x86_64\", \"arm64\", \"ppc64le\"], \"display_name\": \"4.18.20\", \"support_level\": \"production\"}, \"4.18.20-multi\": {\"cpu_architectures\": [\"x86_64\", \"arm64\", \"s390x\", \"ppc64le\"], \"display_name\": \"4.18.20-multi\", \"support_level\": \"production\"}, \"4.19.5\": {\"cpu_architectures\": [\"s390x\", \"arm64\", \"x86_64\", \"ppc64le\"], \"default\": true, \"display_name\": \"4.19.5\", \"support_level\": \"production\"}, \"4.19.5-multi\": {\"cpu_architectures\": [\"x86_64\", \"arm64\", \"s390x\", \"ppc64le\"], \"display_name\": \"4.19.5-multi\", \"support_level\": \"production\"}, \"4.20.0-ec.5\": {\"cpu_architectures\": [\"s390x\", \"arm64\", \"x86_64\", \"ppc64le\"], \"display_name\": \"4.20.0-ec.5\", \"support_level\": \"beta\"}, \"4.20.0-ec.5-multi\": {\"cpu_architectures\": [\"x86_64\", \"arm64\", \"s390x\", \"ppc64le\"], \"display_name\": \"4.20.0-ec.5-multi\", \"support_level\": \"beta\"}, \"4.9.17\": {\"cpu_architectures\": [\"x86_64\"], \"display_name\": \"4.9.17\", \"support_level\": \"end-of-life\"}}', type='text')]"}}
+
+data: {"event": "token", "data": {"id": 7, "role": "inference", "token": ""}}
+
+data: {"event": "token", "data": {"id": 8, "role": "inference", "token": "Here are the available OpenShift versions:\n\n*   **4.10.67**:\n    *   CPU Architectures: x86_64, arm64\n    *   Support Level: end-of-"}}
+
+data: {"event": "token", "data": {"id": 9, "role": "inference", "token": "life\n*   **4.11.59**:\n    *   CPU Architectures: x86_64, arm64\n    *   Support Level: end-of-life\n*   **4"}}
+
+data: {"event": "token", "data": {"id": 10, "role": "inference", "token": ".12.71**:\n    *   CPU Architectures: x86_64\n    *   Support Level: Extended Support\n*   **4.14.51**:\n    *   CPU Architect"}}
+
+data: {"event": "token", "data": {"id": 11, "role": "inference", "token": "ures: arm64, x86_64, ppc64le, s390x\n    *   Support Level: Extended Support\n*   **4.14.51-multi**:\n"}}
+
+data: {"event": "token", "data": {"id": 12, "role": "inference", "token": "    *   CPU Architectures: x86_64, arm64, s390x, ppc64le\n    *   Support Level: Extended Support\n*   **4.15.5"}}
+
+data: {"event": "token", "data": {"id": 13, "role": "inference", "token": "5**:\n    *   CPU Architectures: ppc64le, s390x, x86_64, arm64\n    *   Support Level: maintenance\n*   **4.15"}}
+
+data: {"event": "token", "data": {"id": 14, "role": "inference", "token": ".55-multi**:\n    *   CPU Architectures: x86_64, arm64, s390x, ppc64le\n    *   Support Level: maintenance\n*   **"}}
+
+data: {"event": "token", "data": {"id": 15, "role": "inference", "token": "4.16.44**:\n    *   CPU Architectures: x86_64, ppc64le, arm64, s390x\n    *   Support Level: maintenance\n*"}}
+
+data: {"event": "token", "data": {"id": 16, "role": "inference", "token": "   **4.16.44-multi**:\n    *   CPU Architectures: x86_64, arm64, s390x, ppc64le\n    *   Support Level"}}
+
+data: {"event": "token", "data": {"id": 17, "role": "inference", "token": ": maintenance\n*   **4.17.36**:\n    *   CPU Architectures: x86_64, ppc64le, s390x, arm64\n    *   "}}
+
+data: {"event": "token", "data": {"id": 18, "role": "inference", "token": "Support Level: maintenance\n*   **4.17.36-multi**:\n    *   CPU Architectures: x86_64, arm64, s390x, ppc64le"}}
+
+data: {"event": "token", "data": {"id": 19, "role": "inference", "token": "\n    *   Support Level: maintenance\n*   **4.18.20**:\n    *   CPU Architectures: s390x, x86_64, arm64, ppc6"}}
+
+data: {"event": "token", "data": {"id": 20, "role": "inference", "token": "4le\n    *   Support Level: production\n*   **4.18.20-multi**:\n    *   CPU Architectures: x86_64, arm64, s390x"}}
+
+data: {"event": "token", "data": {"id": 21, "role": "inference", "token": ", ppc64le\n    *   Support Level: production\n*   **4.19.5**:\n    *   CPU Architectures: s390x, arm64, x86_6"}}
+
+data: {"event": "token", "data": {"id": 22, "role": "inference", "token": "4, ppc64le\n    *   Support Level: production\n*   **4.19.5-multi**:\n    *   CPU Architectures: x86_64, arm64, s"}}
+
+data: {"event": "token", "data": {"id": 23, "role": "inference", "token": "390x, ppc64le\n    *   Support Level: production\n*   **4.20.0-ec.5**:\n    *   CPU Architectures: s390x, arm"}}
+
+data: {"event": "token", "data": {"id": 24, "role": "inference", "token": "64, x86_64, ppc64le\n    *   Support Level: beta\n*   **4.20.0-ec.5-multi**:\n    *   CPU Architectures:"}}
+
+data: {"event": "token", "data": {"id": 25, "role": "inference", "token": " x86_64, arm64, s390x, ppc64le\n    *   Support Level: beta\n*   **4.9.17**:\n    *   CPU Architectures"}}
+
+data: {"event": "token", "data": {"id": 26, "role": "inference", "token": ": x86_64\n    *   Support Level: end-of-life\n\nWould you like to create a new cluster using one of these versions? I can help you with that. I'll need a cluster name, the"}}
+
+data: {"event": "token", "data": {"id": 27, "role": "inference", "token": " OpenShift version, a base domain, and whether it's a single-node cluster."}}
+
+data: {"event": "turn_complete", "data": {"id": 28, "token": "Here are the available OpenShift versions:\n\n*   **4.10.67**:\n    *   CPU Architectures: x86_64, arm64\n    *   Support Level: end-of-life\n*   **4.11.59**:\n    *   CPU Architectures: x86_64, arm64\n    *   Support Level: end-of-life\n*   **4.12.71**:\n    *   CPU Architectures: x86_64\n    *   Support Level: Extended Support\n*   **4.14.51**:\n    *   CPU Architectures: arm64, x86_64, ppc64le, s390x\n    *   Support Level: Extended Support\n*   **4.14.51-multi**:\n    *   CPU Architectures: x86_64, arm64, s390x, ppc64le\n    *   Support Level: Extended Support\n*   **4.15.55**:\n    *   CPU Architectures: ppc64le, s390x, x86_64, arm64\n    *   Support Level: maintenance\n*   **4.15.55-multi**:\n    *   CPU Architectures: x86_64, arm64, s390x, ppc64le\n    *   Support Level: maintenance\n*   **4.16.44**:\n    *   CPU Architectures: x86_64, ppc64le, arm64, s390x\n    *   Support Level: maintenance\n*   **4.16.44-multi**:\n    *   CPU Architectures: x86_64, arm64, s390x, ppc64le\n    *   Support Level: maintenance\n*   **4.17.36**:\n    *   CPU Architectures: x86_64, ppc64le, s390x, arm64\n    *   Support Level: maintenance\n*   **4.17.36-multi**:\n    *   CPU Architectures: x86_64, arm64, s390x, ppc64le\n    *   Support Level: maintenance\n*   **4.18.20**:\n    *   CPU Architectures: s390x, x86_64, arm64, ppc64le\n    *   Support Level: production\n*   **4.18.20-multi**:\n    *   CPU Architectures: x86_64, arm64, s390x, ppc64le\n    *   Support Level: production\n*   **4.19.5**:\n    *   CPU Architectures: s390x, arm64, x86_64, ppc64le\n    *   Support Level: production\n*   **4.19.5-multi**:\n    *   CPU Architectures: x86_64, arm64, s390x, ppc64le\n    *   Support Level: production\n*   **4.20.0-ec.5**:\n    *   CPU Architectures: s390x, arm64, x86_64, ppc64le\n    *   Support Level: beta\n*   **4.20.0-ec.5-multi**:\n    *   CPU Architectures: x86_64, arm64, s390x, ppc64le\n    *   Support Level: beta\n*   **4.9.17**:\n    *   CPU Architectures: x86_64\n    *   Support Level: end-of-life\n\nWould you like to create a new cluster using one of these versions? I can help you with that. I'll need a cluster name, the OpenShift version, a base domain, and whether it's a single-node cluster."}}
+
+data: {"event": "end", "data": {"referenced_documents": [], "truncated": null, "input_tokens": 0, "output_tokens": 0}, "available_quotas": {}}
+
