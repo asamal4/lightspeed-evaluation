@@ -1,5 +1,6 @@
 """Custom metrics using direct LLM integration."""
 
+import logging
 import re
 from typing import Any, Optional
 
@@ -12,6 +13,8 @@ from lightspeed_evaluation.core.metrics.custom.prompts import (
 from lightspeed_evaluation.core.metrics.custom.tool_eval import evaluate_tool_calls
 from lightspeed_evaluation.core.models import EvaluationScope, TurnData
 from lightspeed_evaluation.core.system.exceptions import LLMError
+
+logger = logging.getLogger(__name__)
 
 
 class CustomMetrics:  # pylint: disable=too-few-public-methods
@@ -55,9 +58,14 @@ class CustomMetrics:  # pylint: disable=too-few-public-methods
     def _call_llm(self, prompt: str) -> str:
         """Make an LLM call with the configured parameters."""
         result = self.llm.call(prompt, return_single=True)
+
         if isinstance(result, list):
-            return result[0] if result else ""
-        return result
+            response = result[0] if result else ""
+        else:
+            response = result
+
+        logger.debug("Response: %s", response)
+        return response
 
     def _parse_score_response(self, response: str) -> tuple[Optional[float], str]:
         r"""Parse LLM response to extract score and reason.
