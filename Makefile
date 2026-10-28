@@ -18,6 +18,9 @@ uv-lock-check: ## Check that the uv.lock file is in a good shape
 install-deps-test: ## Install all required dev dependencies needed to test the service, according to uv.lock
 	uv sync --group dev
 
+install-deps-test-nlp-metrics: ## Install dev dependencies plus optional NLP metric dependencies
+	uv sync --group dev --extra nlp-metrics
+
 update-deps: uv-lock-regenerate install-deps-test ## Regenerate lock files (with cooldown) and sync dev deps
 
 check-types: ## Checks type hints in sources
@@ -101,7 +104,7 @@ e2e_tests: install-deps-test
 e2e_tests_agentic: install-deps-test ## Run agentic integration tests (requires live OpenShift cluster)
 	uv run pytest tests/integration -v -m agentic
 
-e2e_tests_offline: install-deps-test ## Run offline e2e tests (requires OPENAI_API_KEY, no live Lightspeed API)
+e2e_tests_offline: install-deps-test-nlp-metrics ## Run offline e2e tests (requires OPENAI_API_KEY, no live Lightspeed API)
 	uv run pytest tests/e2e -v -m offline_e2e
 
 e2e_tests_lcore: e2e_tests
